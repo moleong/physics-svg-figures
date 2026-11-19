@@ -17,6 +17,14 @@ data-check="ignore" 聲明：加在 <text> 上跳過該標籤，加在圖元上�
 支援 translate/scale/rotate(含中心)/matrix 巢狀 transform（世界座標量測）；
 自動略過 defs/marker/pattern 定義；文字寬度為估算值且假設文字未隨群組旋轉
 （本系列電路圖皆如此），邊界個案以渲染目視為準。
+
+建議工作流程（修復 flag 時）：
+第一輪就對全部 flag 列印「真實墨盒＋最近線段」——import 本模組後用
+text_ink_rect() 取每個 <text> 的估算墨區，用 seg_rect_dist() 找最近筆畫，
+一次性批量求解。手算盒寬／anchor 屢屢與工具盒不符（已多次推翻「手算已清」，
+首輪猜測命中率約五成）。注意 text-anchor：無此屬性 = start，盒從 x 向右
+延伸；middle 才是以 x 居中。另附 rect_line_distances()（驗旋轉物塊貼線、
+底面中點垂距 ≈0）與 seg_seg_dist()（驗兩線段淨空，相交 = 0）。
 """
 import argparse
 import math
@@ -176,6 +184,57 @@ def seg_rect_dist(p1, p2, rect):
         dy = max(ry0 - py, 0.0, py - ry1)
         best = min(best, math.hypot(dx, dy))
     return best
+
+
+def _pt_seg_dist(p, a, b):
+    ax, ay = a; bx, by = b
+    L2 = (bx - ax) ** 2 + (by - ay) ** 2
+    if L2 == 0:
+        return math.hypot(p[0] - ax, p[1] - ay)
+    t = max(0.0, min(1.0, ((p[0] - ax) * (bx - ax) + (p[1] - ay) * (by - ay)) / L2))
+    return math.hypot(p[0] - (ax + t * (bx - ax)), p[1] - (ay + t * (by - ay)))
+
+
+def _ori(a, b, c):
+    return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+
+
+def seg_seg_dist(p1, p2, q1, q2):
+    """兩線段最近距離（相交 = 0）。驗算繩／擋板／箭頭／彈簧對斜面、地面的全長淨空：
+    畫完線段類元素後必跑，淨空應 ≥ 設計間隙（貼合類元素除外，其距離應 ≈ 0）。"""
+    d1, d2 = _ori(p1, p2, q1), _ori(p1, p2, q2)
+    d3, d4 = _ori(q1, q2, p1), _ori(q1, q2, p2)
+    if ((d1 > 0) != (d2 > 0)) and ((d3 > 0) != (d4 > 0)) and d1 != 0 and d2 != 0 and d3 != 0 and d4 != 0:
+        return 0.0
+    for p in (p1, p2):
+        if min(_ori(q1, q2, p), 0) * max(_ori(q1, q2, p), 0) == 0 and _pt_seg_dist(p, q1, q2) < 1e-9:
+            return 0.0
+    return min(_pt_seg_dist(p1, q1, q2), _pt_seg_dist(p2, q1, q2),
+               _pt_seg_dist(q1, p1, p2), _pt_seg_dist(q2, p1, p2))
+
+
+def rect_line_distances(x, y, w, h, rot_deg, cx, cy, p1, p2):
+    """驗算旋轉矩形與直線的貼合關係（放物塊於斜面/桌面後必驗）。
+
+    回傳四角與四邊中點到直線的帶號垂直距離（線方向為 p1→p2，左側為正）。
+    貼合判準（以底面貼斜面為例）：底邊中點 |d| < 1.0，且底面兩角同號、
+    |d| < 1.5（無一角沉入線下）。正數在線左側（沿 p1→p2 方向的左手邊）。
+    """
+    m = parse_transform(f'rotate({rot_deg} {cx} {cy})')
+    dx, dy = p2[0] - p1[0], p2[1] - p1[1]
+    L = math.hypot(dx, dy) or 1.0
+    ux, uy = -dy / L, dx / L          # 左側法線
+
+    def sd(px, py):
+        q = apply_mat(m, (px, py))
+        return (q[0] - p1[0]) * ux + (q[1] - p1[1]) * uy
+
+    pts = {
+        'TL': (x, y), 'TR': (x + w, y), 'BR': (x + w, y + h), 'BL': (x, y + h),
+        'top_mid': (x + w / 2, y), 'right_mid': (x + w, y + h / 2),
+        'bottom_mid': (x + w / 2, y + h), 'left_mid': (x, y + h / 2),
+    }
+    return {k: round(sd(*v), 2) for k, v in pts.items()}
 
 
 def mat_mul(m1, m2):
