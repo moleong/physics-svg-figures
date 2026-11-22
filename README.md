@@ -1,23 +1,34 @@
 # physics-svg-figures
 
-Kimi Code skill：把掃描版物理課本插圖（滑輪組、斜面、連接體、受力圖）重繪成講義 HTML 的內聯 SVG，或檢查/修正現有 SVG 圖示的幾何錯誤。
+物理／STEM 內聯 SVG 插圖技能：負責圖內的物理語義、電路拓撲、參數化幾何、符號、標註、語義色、唯一 ID 與 viewBox 驗收。HTML 頁面尺寸、外距、響應式及列印由 `teaching-ppt` 等宿主技能負責。
 
-## 核心內容（SKILL.md）
+## 內容
 
-- **核心判別**：自由示意圖可手掰座標；強約束機械圖必須參數化幾何（圓心/半徑/角度/切點公式推座標）。
-- **工作流程六步**：物件/約束清單 → 定參數 → 結構層 → 標註層 → 驗證 → 瀏覽器截圖對比原圖。
-- **幾何規則**：繩-滑輪相切公式、繩過物塊側面中點的 h/2 推導鏈（含 h ≥ 4r 兩種合規形態）、出口側約束、貼合/不侵入。
-- **視覺語言**：pattern 剖面線、楔形/厚板、滑輪支承三式與斜撐圖層順序。
-- **標註語義**：顏色系統、同色箭頭、貼繩、方向核對、≥6–8px 碰撞檢查。
-- **物理規範四層級**（力學正確 → 幾何正確 → 資訊完備 → 視覺語言）作為驗收標準。
-- **工作流程六步**：規格書三清單（受力／幾何約束／原圖元素對照）→ 定參數 → 實作 → **對抗式審查（力學／幾何／原圖三審查官）** → 驗收 → 瀏覽器對比。
-- 幾何規則：pattern 剖面線、楔形/厚板、滑輪支承三式與斜撐圖層順序、標註語義、≥6–8px 碰撞檢查。
-- **18 項驗收檢查表**（#17＝交付前必跑 `svg_label_check.py` 程式量測每個標註到所有線段的距離，刻意重疊以 `data-check="ignore"` 聲明；#18＝複用／鏡像圖元後重推方向約束）+ 四條元規律（單一關係定位無驗證／圖層遮罩改變語義／規則寫了沒執行／審查工具未經覆核）。
+- `SKILL.md`：共同核心、四層驗收、工作流程與共用工具。
+- `references/mechanics.md`：受力、參考系、滑輪、繩、斜面與接觸。
+- `references/circuits.md`：電路生成器、電源、元件、節點與變阻器。
+- `references/graphs.md`：定量／定性圖象、公式取樣、關鍵點與刻度。
+- `references/integration-contract.md`：明暗主題、唯一 ID、回交格式及宿主驗收。
+- `assets/circuit.mjs`：靜態電路 SVG 生成器。
+- `assets/svg_label_check.py`：text×線、text×text、viewBox 與豁免理由檢查。
+- `assets/trim-viewbox.py`：瀏覽器量測後只整理 viewBox；支援刻意留白保留。
 
-## 由來
+## 快速使用
 
-由一個高中物理講義系列（泛珠補充 A1-01～A2）的五輪實戰沉澱：四幅連接體插圖反覆出現 14 類錯誤（異心弧、角點拉繩、侵入牆面、標註碰撞、共享邊中線、斜撐連到輪邊等），逐輪修正後收斂為本規則集。其後對全系列 19 份講義 79 個 SVG 做全面審計（35 項問題、四批修復、153 處標註修正），再沉澱出「物理規範四層級 + 規格書三清單 + 對抗式審查」方法論與 #15–#16 檢查項。
+```bash
+# 電路範例
+node assets/circuit.mjs assets/circuit-example.mjs --html > /tmp/circuit-example.html
+
+# 標註檢查；距離以 400 單位參考圖寬表示
+python3 assets/svg_label_check.py 成品.html --threshold 6 --reference-width 400
+
+# viewBox 量測與回寫
+python3 assets/trim-viewbox.py gen 成品.html -o /tmp/svg-harness.html
+python3 assets/trim-viewbox.py apply bbox.txt 成品.html
+```
+
+刻意接觸須同時寫 `data-check="ignore"` 和 `data-check-reason="具體理由"`；刻意留白或共同對齊則在 SVG 加 `data-viewbox="preserve"`。工具通過不代表物理語義正確，仍須按 `SKILL.md` 做對抗式審查及實際宿主渲染。
 
 ## 安裝
 
-把本目錄複製到 `~/.kimi-code/skills/physics-svg-figures/`，或用 Kimi Code 的 skill 管理功能載入。teaching-ppt skill 在需要物理插圖時會交叉引用本 skill。
+把本目錄複製到 `~/.kimi-code/skills/physics-svg-figures/`，或安裝封裝後的 `.skill` 檔。需要物理插圖的 HTML 教材應同時載入本技能與宿主技能。
